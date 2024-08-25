@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# Simple DNS manager for Linux
+
+# Directory to store favorite configurations
+CONFIGS_DIR="./configs"
+RESOLV_CONF="/etc/resolv.conf"
+
+# Ensure the configs directory exists
+mkdir -p "$CONFIGS_DIR"
+
+# Function to view the current config
+view_current_config() {
+    dialog --title "Current /etc/resolv.conf" --msgbox "$(cat $RESOLV_CONF)" 20 60
+}
+
+# Function to display favorite configs
+view_favorites() {
+    configs=("$CONFIGS_DIR"/*.conf)
+    config_names=()
+    
+    for config in "${configs[@]}"; do
+        config_names+=("$(basename "$config")")
+    done
+
+    if [ ${#config_names[@]} -eq 0 ]; then
+        dialog --msgbox "No favorite configurations found." 10 40
+        return
+    fi
+
+    config_choice=$(dialog --title "Favorites" --menu "Select a config to view" 15 50 5 "${config_names[@]}" 3>&1 1>&2 2>&3)
+
+    if [ -n "$config_choice" ]; then
+        dialog --title "Config: $config_choice" --msgbox "$(cat "$CONFIGS_DIR/$config_choice")" 20 60
+    fi
+}
+
+# Function to edit the current config
+edit_current_config() {
+    sudo nano "$RESOLV_CONF"
+}
+
+# Function to create a new config
+new_config() {
+    config_name=$(dialog --inputbox "Enter new configuration name:" 10 30 3>&1 1>&2 2>&3)
+    if [ -n "$config_name" ]; then
+        nano "$CONFIGS_DIR/$config_name.conf"
+    fi
+}
+
+# Function to load a config
+load_config() {
+    configs=("$CONFIGS_DIR"/*.conf)
+    config_names=()
+
+    for config in "${configs[@]}"; do
+        config_names+=("$(basename "$config")")
+    done
+
+    if [ ${#config_names[@]} -eq 0 ]; then
+        dialog --msgbox "No configurations available to load." 10 40
+        return
+    fi
+
+    config_choice=$(dialog --title "Load Config" --menu "Select a config to load into /etc/resolv.conf" 15 50 5 "${config_names[@]}" 3>&1 1>&2 2>&3)
+
+    if [ -n "$config_choice" ]; then
+        backup_choice=$(dialog --yesno "Do you want to backup the current /etc/resolv.conf before loading?" 10 30 3>&1 1>&2 2>&3)
+
+        if [ $? -eq 0 ]; then
+            cp "$RESOLV_CONF" "$RESOLV_CONF.bak"
+            dialog --msgbox "Backup created at $RESOLV_CONF.bak" 10 30
+        fi
+
+        sudo cp "$CONFIGS_DIR/$config_choice" "$RESOLV_CONF"
+        dialog --msgbox "Configuration $config_choice loaded successfully." 10 30
+    fi
+}
+
+# Function to save the current config
+save_current_config() {
+    config_name=$(dialog --inputbox "Enter name to save current configuration as:" 10 30 3>&1 1>&2 2>&3)
+    if [ -n "$config_name" ]; then
+        sudo cp "$RESOLV_CONF" "$CONFIGS_DIR/$config_name.conf"
+        dialog --msgbox "Current configuration saved as $config_name.conf" 10 30
+    fi
+}
+
+# Main menu
+while true; do
+    choice=$(dialog --clear --title "DNS Config Manager" --menu "Choose an option:" 15 50 5 \
+        1 "View config" \
+        2 "Edit config" \
+        3 "Exit" 3>&1 1>&2 2>&3)
+
+    case $choice in
+        1)
+            view_choice=$(dialog --clear --title "View Config" --menu "Choose an option:" 15 50 3 \
+                1 "Current config" \
+                2 "Favorites" 3>&1 1>&2 2>&3)
+            case $view_choice in
+                1) view_current_config ;;
+                2) view_favorites ;;
+            esac
+            ;;
+        2)
+            edit_choice=$(dialog --clear --title "Edit Config" --menu "Choose an option:" 15 50 4 \
+                1 "Edit current config" \
+                2 "New config" \
+                3 "Load config" \
+                4 "Save config" 3>&1 1>&2 2>&3)
+            case $edit_choice in
+                1) edit_current_config ;;
+                2) new_config ;;
+                3) load_config ;;
+                4) save_current_config ;;
+            esac
+            ;;
+        3)
+            break
+            ;;
+    esac
+done
+
+# Clear screen after exit
+clear
