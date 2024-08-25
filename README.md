@@ -1,0 +1,2 @@
+# DNSM
+Simple DNS Manager
